@@ -59,6 +59,8 @@ Graph::Graph(){}
 Graph::Graph(int size){
     // construct empty graph
     this->size = size;
+    this->minCost = 1;
+    this->maxCost = 1;
     graph = new bool*[size];
     for(int i=0; i<size; i++)
         graph[i] = new bool[size];
