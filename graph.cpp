@@ -1,7 +1,6 @@
 #ifndef GRAPH
 #define GRAPH
 #include "util.cpp"
-using namespace std;
 
 struct edge{
     // a tuple of int to represent graph edge
@@ -27,6 +26,7 @@ public:
     /**** constructors ****/
     Graph();
     Graph(int size);
+    Graph(Graph& graph);
     Graph(int size, double density, double minCost, double maxCost);
     Graph(ifstream& file);
     /**** destructor ****/
@@ -34,6 +34,8 @@ public:
     /**** accessors ****/
     int getSize();
     int getEdges();
+    int getMinCost();
+    int getMaxCost();
     void printGraph(bool matrix);
     bool isAdjacent(int n, int m);
     vector<int> getNeighbors(int n);
@@ -67,6 +69,25 @@ Graph::Graph(int size){
     cost = new double*[size];
     for(int i=0; i<size; i++)
         cost[i] = new double[size];
+}
+
+Graph::Graph(Graph& g){
+    // copy from graph g
+    this->size = g.getSize();
+    this->minCost = g.getMinCost();
+    this->maxCost = g.getMaxCost();
+    graph = new bool*[size];
+    for(int i=0; i<size; i++){
+        graph[i] = new bool[size];
+        for(int j=0; j<size; j++)
+            graph[i][j] = g.isAdjacent(i,j);
+    }
+    cost = new double*[size];
+    for(int i=0; i<size; i++){
+        cost[i] = new double[size];
+        for(int j=0; j<size; j++)
+            cost[i][j] = g.getCost(i,j);
+    }
 }
 
 Graph::Graph(int size, double density, double minCost, double maxCost){
@@ -131,6 +152,16 @@ int Graph::getEdges(){
         for(int j=i+1; j<size; j++)
             edges += graph[i][j];
     return edges;
+}
+
+int Graph::getMinCost(){
+    // lower buond of cost
+    return minCost;
+}
+
+int Graph::getMaxCost(){
+    // upper buond of cost
+    return maxCost;
 }
 
 void Graph::printGraph(bool matrix=true){

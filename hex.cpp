@@ -25,7 +25,7 @@ public:
     point toPoint(int n);
     bool inBoard(const point& p);
     /**** accessors ****/
-    void printBoard();
+    void printBoard(int* Marker);
     /**** game ****/
     void welcome();
     void result();
@@ -33,9 +33,16 @@ public:
     void chooseFirstPlayer();
     void nextPlayer();
     vector<point> legalMoves();
+    bool hasWon(const vector<point>& start, const vector<point>& end, Graph& playerGraph);
     bool gameFinished();
     void inputNextMove();
-    point machineMove(vector<point> moves);
+    void logInputtedMove(vector<point>& Player, Graph& playerGraph, const point& p);
+    point machineMove(const vector<point>& moves);
+    // MACHINE ALGORITHMS HERE!
+    point machineRandomMove(const vector<point>& moves);
+    point machineRightmostMove(const vector<point>& moves);
+    point machineMCMove(const vector<point>& moves); // TO DO
+    point machineAlphaBetaMove(const vector<point>& moves); // TO DO
     void runGame();
 };
 
@@ -69,11 +76,11 @@ Hex::Hex(int size):player1Graph(size*size),player2Graph(size*size){
 
 /**** accessors ****/
 
-void Hex::printBoard(){
+void Hex::printBoard(int* Marker){
     // print game board
     // marker: player1 = X, player2 = O
     point p;
-    seperator(6*size-5);
+    seperator(50);
     cout << "round " << round << " board" << endl;
     for(int i=0; i<size; i++){
         /* print board points */
@@ -81,14 +88,14 @@ void Hex::printBoard(){
         cout << string(2*i,' ');
         for(int j=0; j<size-1; j++){
             p = point(i,j);
-            if(marker[toNode(p)]==1) cout << "X - "; // occupied by player 1
-            else if(marker[toNode(p)]==2) cout << "O - "; // occupied by player 2
+            if(Marker[toNode(p)]==1) cout << "X - "; // occupied by player 1
+            else if(Marker[toNode(p)]==2) cout << "O - "; // occupied by player 2
             else cout << ". - "; // unoccupied
         }
         // last board points
         p = point(i,size-1);
-        if(marker[toNode(p)]==1) cout << "X" << endl; // occupied by player 1
-        else if(marker[toNode(p)]==2) cout << "O" << endl; // occupied by player 2
+        if(Marker[toNode(p)]==1) cout << "X" << endl; // occupied by player 1
+        else if(Marker[toNode(p)]==2) cout << "O" << endl; // occupied by player 2
         else cout << "." << endl; // unoccupied
         /* print connections between board points (edges) */
         if(i<size-1){
@@ -97,7 +104,7 @@ void Hex::printBoard(){
             cout << "\\" << endl;
         }
     }
-    seperator(6*size-5);
+    seperator(50);
 }
 
 /**** game ****/
@@ -132,6 +139,7 @@ void Hex::result(){
 
 void Hex::chooseMode(){
     // choose game mode: 1. human vs human, or 2. human vs machine
+    // ADD: MODE 3 - MACHINE VS MACHINE?
     cout <<
     "Game mode:\n"
     "  1. human vs human\n"
@@ -167,23 +175,31 @@ vector<point> Hex::legalMoves(){
     return moves;
 }
 
+bool Hex::hasWon(const vector<point>& start, const vector<point>& end, Graph& playerGraph){
+    // check if there is a path linking to opposite edge
+    // i.e., any paths that go from start points to end points
+    vector<node>* paths;
+    for(auto p:start){
+        paths = playerGraph.shortestPaths(toNode(p));
+        for(auto q:end)
+            if(paths[toNode(q)].size()!=0)
+                return true;
+    }
+    return false;
+}
+
 bool Hex::gameFinished(){
     // check if game has finished, i.e., one player has won
     vector<point> start,end;
-    vector<node>* paths;
 
     /* has player 1 won? */
     for(auto p:player1){
         if(p.x==0) start.push_back(p); // board points on top edge (North)
         if(p.x==size-1) end.push_back(p); // board points on bottom edge (South)
     }
-    for(auto p:start){
-        paths = player1Graph.shortestPaths(toNode(p));
-        for(auto q:end) // check if there is a path linking to opposite edge
-            if(paths[toNode(q)].size()!=0){ // player 1 wins, game ends
-                winner = 1;
-                return true;
-            }
+    if(hasWon(start,end,player1Graph)){
+        winner = 1;
+        return true;
     }
 
     /* has player 2 won? */
@@ -192,13 +208,9 @@ bool Hex::gameFinished(){
         if(p.y==0) start.push_back(p); // board points on left edge (West)
         if(p.y==size-1) end.push_back(p); // board points on right edge (East)
     }
-    for(auto p:start){
-        paths = player2Graph.shortestPaths(toNode(p));
-        for(auto q:end) // check if there is a path linking to opposite edge
-            if(paths[toNode(q)].size()!=0){ // player 2 wins, game ends
-                winner = 2;
-                return true;
-            }
+    if(hasWon(start,end,player2Graph)){
+        winner = 2;
+        return true;
     }
     return false;
 }
@@ -223,40 +235,50 @@ void Hex::inputNextMove(){
     }else
     /* call for machine input */
     if(mode==2 && player==2){
+        auto startTime = high_resolution_clock::now();
         p = machineMove(moves);
+        auto endTime = high_resolution_clock::now();
         cout << "(machine move) round " << round << " | now player 2's turn: " << p << endl;
+        cout << "               time taken: " << duration_cast<seconds>(endTime-startTime).count()  << " s" << endl;
     }
 
-    /* log the inputted move */
+    /* log inputted move */
     if(player==1){
         marker[toNode(p)] = 1;
-        player1.push_back(p);
-        for(auto v:neighborVec) // connect p to board points around p in player's graph
-            if(find(player1.begin(),player1.end(),p+v)!=player1.end()){
-                player1Graph.addEdge(toNode(p),toNode(p+v));
-                player1Graph.setCost(toNode(p),toNode(p+v),1);
-            }
+        logInputtedMove(player1,player1Graph,p);
     }else if(player==2){
         marker[toNode(p)] = 2;
-        player2.push_back(p);
-        for(auto v:neighborVec) // connect p to board points around p in player's graph
-            if(find(player2.begin(),player2.end(),p+v)!=player2.end()){
-                player2Graph.addEdge(toNode(p),toNode(p+v));
-                player2Graph.setCost(toNode(p),toNode(p+v),1);
-            }
+        logInputtedMove(player2,player2Graph,p);
     }
 }
 
-point Hex::machineMove(vector<point> moves){
-    // ALGORITHMS HERE!
+void Hex::logInputtedMove(vector<point>& Player, Graph& playerGraph, const point& p){
+    // log inputted move
+    Player.push_back(p);
+    for(auto v:neighborVec) // connect p to board points around p in player's graph
+        if(find(Player.begin(),Player.end(),p+v)!=Player.end()){
+            playerGraph.addEdge(toNode(p),toNode(p+v));
+            playerGraph.setCost(toNode(p),toNode(p+v),1);
+        }
+}
+
+point Hex::machineMove(const vector<point>& moves){
+    // AI ALGORITHMS HERE!
     // algorithmically generate next move (mode 2, player 2)
-    point p;
 
-    /* 1. dumb random move */
-    // p = moves[rand()%moves.size()];
+    // return machineRandomMove();
+    // return machineRightmostMove(moves);
+    return machineMCMove(moves);
+}
 
-    /* 2. choose rightmost move */
-    if(round==1) p = point(size/2,0); // first round: begins at left edge
+point Hex::machineRandomMove(const vector<point>& moves){
+    // dumb random move
+    return moves[rand()%moves.size()];
+}
+
+point Hex::machineRightmostMove(const vector<point>& moves){
+    // choose rightmost move
+    if(round==1) return point(size/2,0); // first round: begins at left edge
     else{
         priorityQueue q;
         auto ptr=player2.end()-1; // "rightmost" end of path
@@ -267,23 +289,59 @@ point Hex::machineMove(vector<point> moves){
                     q.add(toNode(*ptr+v),(*ptr+v).y);
             ptr--;
         }
-        p = toPoint(q.popHeadNode().label);
+        return toPoint(q.popHeadNode().label);
     }
-    return p;
 }
+
+point Hex::machineMCMove(const vector<point>& moves){
+    // choose next move that has highest prob to win
+    int wins;
+    const int trials=1000; // num of trials for each possible move
+    double winProb;
+    priorityQueue q; // moves that have higher win prob have higher prioirty
+    for(int i=0; i<moves.size(); i++){
+        // show progress bar
+        cout << "  running: " << progressBars[i%sizeof(progressBars)] << ' ' << static_cast<int>(100.*i/moves.size()) << "%\r";
+        cout.flush();
+
+        wins = 0;
+        vector<point> shuffledMoves = moves;
+        shuffledMoves.erase(shuffledMoves.begin()+i);
+        for(int trial=0; trial<trials; trial++){
+            vector<point> start,end;
+            vector<point> player2Sim = player2; // player 2's simulated moves
+            Graph player2GraphSim = player2Graph; // graph representation of player 2's simulated moves
+            logInputtedMove(player2Sim,player2GraphSim,moves[i]); // move[i] chosen as next move
+            random_shuffle(shuffledMoves.begin(),shuffledMoves.end()); // first half as player 2's moves
+            for(int j=0; j<shuffledMoves.size()/2; j++)
+                logInputtedMove(player2Sim,player2GraphSim,shuffledMoves[j]);
+            for(auto p:player2Sim){
+                if(p.y==0) start.push_back(p); // board points on left edge (West)
+                if(p.y==size-1) end.push_back(p); // board points on right edge (East)
+            }
+            if(hasWon(start,end,player2GraphSim)) wins++; // player 2 wins, player 1 loses (implied)
+        }
+        winProb = static_cast<double>(wins)/trials;
+        q.add(i,winProb);
+    }
+    // q.print();
+    return moves[q.popHeadNode().label];
+}
+
+// point machineAlphaBetaMove(const vector<point>& moves){}
 
 void Hex::runGame(){
     // run the game: human vs human, or human vs machine
     welcome(); // game instructions
-    seperator(10);
+    seperator(50);
     chooseMode(); // game mode
     chooseFirstPlayer(); // first player
     while(!gameFinished()){
-        printBoard(); // print board before next move
+        printBoard(marker); // print board before next move
         inputNextMove(); // (player 1,2 alternating) call for next move
         nextPlayer(); // next player
     }
-    seperator(6*size-5);
+    seperator(50);
     result(); // game result
 }
 

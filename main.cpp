@@ -1,23 +1,14 @@
 /*
-Hex game - 11/4/2020
-
-instructions:
-- display the game board
-- allow an input and determine if the inputted move is legal
-- determine who wins
-- implement simple strategy for human-machine play
-
-note:
-- to grade, pls look into my hex class in hex.cpp (other files are simply auxiliary)
-- my (naive) machine stratrgy implemented include: 1. random move, 2. rightmost move (see point Hex::machineMove(vector<point> moves))
-- the whole folder contains 4 files: util.cpp, graph.cpp, hex.cpp, main.cpp
-- hex.cpp contains the hex class (core part), main.cpp runs the game
-- util.cpp, graph.cpp contain elements from previous homework (which are used in hex.cpp)
+Hex game and AI - 12/4/2020
 */
 #include "hex.cpp"
 
 int main(){
     srand(clock());
-    Hex hex(7); // instantiate Hex game
+    int size;
+    cout << "Choose a board (e.g. enter 7 for a 7*7 game board): ";
+    cin >> size;
+    seperator(50);
+    Hex hex(size); // instantiate Hex game
     hex.runGame(); // run the game (play on terminal)
 }

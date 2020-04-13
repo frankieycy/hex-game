@@ -5,9 +5,13 @@
 #include <cstdlib>
 #include <ctime>
 #include <vector>
+#include <algorithm>
+#include <chrono>
 using namespace std;
+using namespace std::chrono;
 
 /* miscellaneous */
+const char progressBars[] = {'-','\\','|','/'};
 inline void seperator(int length=20){cout << string(length,'-') << endl;}
 inline double prob(){return static_cast<double>(rand())/RAND_MAX;}
 inline double uniformRand(double min, double max){return min+(max-min)*prob();}
