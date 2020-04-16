@@ -19,9 +19,11 @@ inline ostream& operator<<(ostream& out, const edge& e){
 class Graph{
 private:
     int size;
+    bool useList=false;
     double minCost,maxCost;
     double** cost; // edge cost matrix
     bool** graph; // graph edge matrix (aka. connectivity/adjacency matrix)
+    vector<int>* adjList; // adjacency list (for sparse graph)
 public:
     /**** constructors ****/
     Graph();
@@ -30,12 +32,13 @@ public:
     Graph(int size, double density, double minCost, double maxCost);
     Graph(ifstream& file);
     /**** destructor ****/
-    // ~Graph();
+    ~Graph();
     /**** accessors ****/
     int getSize();
     int getEdges();
     int getMinCost();
     int getMaxCost();
+    bool getUseList();
     void printGraph(bool matrix);
     bool isAdjacent(int n, int m);
     vector<int> getNeighbors(int n);
@@ -44,12 +47,14 @@ public:
     double getAvgShortestPathCost(int n);
     void printMinSpanningTree(int n);
     /**** mutators ****/
+    void makeAdjList();
     void addEdge(int n, int m);
     void deleteEdge(int n, int m);
     void setCost(int n, int m, double c);
     void setRandCost(int n, int m);
     /**** algorithms ****/
     bool isConnected();
+    int* shortestPathNodes(int n);
     vector<node>* shortestPaths(int n);
     vector<edge> minSpanningTree(int n);
 };
@@ -79,8 +84,9 @@ Graph::Graph(Graph& g){
     graph = new bool*[size];
     for(int i=0; i<size; i++){
         graph[i] = new bool[size];
-        for(int j=0; j<size; j++)
+        for(int j=0; j<size; j++){
             graph[i][j] = g.isAdjacent(i,j);
+        }
     }
     cost = new double*[size];
     for(int i=0; i<size; i++){
@@ -88,6 +94,7 @@ Graph::Graph(Graph& g){
         for(int j=0; j<size; j++)
             cost[i][j] = g.getCost(i,j);
     }
+    if(g.getUseList()) makeAdjList();
 }
 
 Graph::Graph(int size, double density, double minCost, double maxCost){
@@ -138,6 +145,18 @@ Graph::Graph(ifstream& file){
     }while(file >> i >> j >> c);
 }
 
+/**** destructor ****/
+
+Graph::~Graph(){
+    for(int i=0; i<size; i++){
+        delete[] graph[i];
+        delete[] cost[i];
+    }
+    delete[] graph;
+    delete[] cost;
+    if(useList) delete[] adjList;
+}
+
 /**** accessors ****/
 
 int Graph::getSize(){
@@ -162,6 +181,11 @@ int Graph::getMinCost(){
 int Graph::getMaxCost(){
     // upper buond of cost
     return maxCost;
+}
+
+bool Graph::getUseList(){
+    // bool of adjacency list or not
+    return useList;
 }
 
 void Graph::printGraph(bool matrix=true){
@@ -243,15 +267,32 @@ void Graph::printMinSpanningTree(int n){
 
 /**** mutators ****/
 
+void Graph::makeAdjList(){
+    // fill in adjacency list
+    adjList = new vector<int>[size];
+    for(int i=0; i<size; i++)
+        for(int j=0; j<size; j++)
+            if(graph[i][j]) adjList[i].push_back(j);
+    useList = true;
+}
+
 void Graph::addEdge(int n, int m){
     // connect node n and m
     graph[n][m] = graph[m][n] = 1;
+    if(useList){
+        adjList[n].push_back(m);
+        adjList[m].push_back(n);
+    }
 }
 
 void Graph::deleteEdge(int n, int m){
     // disconnect node n and m
     graph[n][m] = graph[m][n] = 0;
     cost[n][m] = cost[m][n] = 0;
+    if(useList){
+        adjList[n].erase(find(adjList[n].begin(),adjList[n].end(),m));
+        adjList[m].erase(find(adjList[m].begin(),adjList[m].end(),n));
+    }
 }
 
 void Graph::setCost(int n, int m, double c){
@@ -293,6 +334,63 @@ bool Graph::isConnected(){
     return true;
 }
 
+int* Graph::shortestPathNodes(int n){
+    // Dijkstra's shortest path from source node n to other nodes
+    // return an array of (prev) node indices
+    const int inf = size*maxCost;
+    int current; // node currently being explored
+    int* prev = new int[size];
+    bool* closed = new bool[size]; // expanded nodes
+    double* nodeCost = new double[size]; // tentative cost from node n
+    double c; // tentative cost
+    priorityQueue q; // priority queue for uniform cost search
+
+    /**** initialization ****/
+    nodeCost[n] = 0; // start from node n
+    for(int i=0; i<size; i++){
+        closed[i] = false;
+        prev[i] = -1; // flag value
+        if(i!=n) nodeCost[i] = inf;
+        // prioirty: -cost
+        node tmpNode(i,-nodeCost[i]);
+        q.add(tmpNode);
+    }
+
+    /**** uniform cost search ****/
+    // loop until queue is empty or remaining nodes are disconnected
+    while(!q.isEmpty() && q.peekHeadNode().value!=-inf){
+        current = q.popHeadNode().label; // pop node with lowest cost
+        if(useList){
+            // unvisited neighbors of current node
+            for(auto i:adjList[current])
+                if(!closed[i]){
+                    c = nodeCost[current]+cost[current][i];
+                    // update tentative cost
+                    if(c<nodeCost[i]){
+                        nodeCost[i] = c;
+                        prev[i] = current;
+                        q.chgPriority(i,-c); // update priority queue
+                    }
+                }
+        }else{
+            for(int i=0; i<size; i++)
+                // unvisited neighbors of current node
+                if(!closed[i] && graph[current][i]){
+                    c = nodeCost[current]+cost[current][i];
+                    // update tentative cost
+                    if(c<nodeCost[i]){
+                        nodeCost[i] = c;
+                        prev[i] = current;
+                        q.chgPriority(i,-c); // update priority queue
+                    }
+                }
+        }
+        closed[current] = true;
+    }
+
+    return prev;
+}
+
 vector<node>* Graph::shortestPaths(int n){
     // Dijkstra's shortest path from source node n to other nodes
     // return an array of shortest path vectors (of nodes)
@@ -321,17 +419,31 @@ vector<node>* Graph::shortestPaths(int n){
     // loop until queue is empty or remaining nodes are disconnected
     while(!q.isEmpty() && q.peekHeadNode().value!=-inf){
         current = q.popHeadNode().label; // pop node with lowest cost
-        for(int i=0; i<size; i++)
+        if(useList){
             // unvisited neighbors of current node
-            if(!closed[i] && graph[current][i]){
-                c = nodeCost[current]+cost[current][i];
-                // update tentative cost
-                if(c<nodeCost[i]){
-                    nodeCost[i] = c;
-                    prev[i] = current;
-                    q.chgPriority(i,-c); // update priority queue
+            for(auto i:adjList[current])
+                if(!closed[i]){
+                    c = nodeCost[current]+cost[current][i];
+                    // update tentative cost
+                    if(c<nodeCost[i]){
+                        nodeCost[i] = c;
+                        prev[i] = current;
+                        q.chgPriority(i,-c); // update priority queue
+                    }
                 }
-            }
+        }else{
+            for(int i=0; i<size; i++)
+                // unvisited neighbors of current node
+                if(!closed[i] && graph[current][i]){
+                    c = nodeCost[current]+cost[current][i];
+                    // update tentative cost
+                    if(c<nodeCost[i]){
+                        nodeCost[i] = c;
+                        prev[i] = current;
+                        q.chgPriority(i,-c); // update priority queue
+                    }
+                }
+        }
         closed[current] = true;
         // q.print(); // show the search
     }
@@ -343,13 +455,12 @@ vector<node>* Graph::shortestPaths(int n){
     for(int m=0; m<size; m++){
         if(prev[m]!=-1){ // node m connected to n
             int i = m; // iterator from node m to n
+            int prev_i = m;
             while(i!=n){ // continue if have not traced back to node n
-                node tmpNode(i,nodeCost[i]);
-                paths[m].insert(paths[m].begin(),tmpNode);
+                paths[m].insert(paths[m].begin(),node(i,nodeCost[i]));
                 i = prev[i];
             }
-            node tmpNode(n,nodeCost[n]);
-            paths[m].insert(paths[m].begin(),tmpNode); // prepend source node n
+            paths[m].insert(paths[m].begin(),node(n,0)); // prepend source node n
         }
     }
     return paths;

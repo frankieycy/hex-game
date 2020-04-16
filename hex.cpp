@@ -20,6 +20,8 @@ public:
     /**** constructors ****/
     Hex();
     Hex(int size);
+    /**** destructors ****/
+    ~Hex();
     /**** helper functions ****/
     int toNode(const point& p);
     point toPoint(int n);
@@ -41,8 +43,9 @@ public:
     // MACHINE ALGORITHMS HERE!
     point machineRandomMove(const vector<point>& moves);
     point machineRightmostMove(const vector<point>& moves);
-    point machineMCMove(const vector<point>& moves); // TO DO
+    point machineMCMove(const vector<point>& moves);
     point machineAlphaBetaMove(const vector<point>& moves); // TO DO
+    int getHeuristic();
     void runGame();
 };
 
@@ -66,12 +69,23 @@ Hex::Hex(int size):player1Graph(size*size),player2Graph(size*size){
     this->mode = 0;
     this->round = 0;
     this->player = 0;
+    // this->player1Graph = Graph(size*size);
+    // this->player2Graph = Graph(size*size);
+    // use adjacency list for sparse graphs
+    // player1Graph.makeAdjList();
+    // player2Graph.makeAdjList();
     point p;
     marker = new int[size*size];
     // fill in board points
     for(int i=0; i<size; i++)
         for(int j=0; j<size; j++)
             boardPoints.push_back(point(i,j));
+}
+
+/**** destructors ****/
+
+Hex::~Hex(){
+    delete[] marker;
 }
 
 /**** accessors ****/
@@ -178,11 +192,13 @@ vector<point> Hex::legalMoves(){
 bool Hex::hasWon(const vector<point>& start, const vector<point>& end, Graph& playerGraph){
     // check if there is a path linking to opposite edge
     // i.e., any paths that go from start points to end points
-    vector<node>* paths;
+    // CORRECTION: inefficient! could make borders on one side and the opposite, then do one search
+    int* pathNodes;
+    if(start.size()==0 || end.size()==0) return false;
     for(auto p:start){
-        paths = playerGraph.shortestPaths(toNode(p));
+        pathNodes = playerGraph.shortestPathNodes(toNode(p));
         for(auto q:end)
-            if(paths[toNode(q)].size()!=0)
+            if(pathNodes[toNode(q)]!=-1)
                 return true;
     }
     return false;
@@ -224,10 +240,17 @@ void Hex::inputNextMove(){
     /* ask for human input */
     if(mode==1 || (mode==2 && player==1)){
         int i,j;
+        string inputi, inputj;
         bool isIllegal = true;
         while(isIllegal){
             cout << "round " << round << " | now player " << player << "'s turn: ";
-            cin >> i >> j;
+            cin >> inputi >> inputj;
+            if(!isInt(inputi) || !isInt(inputj)){ // ensure integer input
+                cout << "(non-integer input) ";
+                continue;
+            }
+            i = stoi(inputi);
+            j = stoi(inputj);
             p = point(i,j);
             if(find(moves.begin(),moves.end(),p)!=moves.end()) isIllegal = false; // a legal move
             else cout << "(previous move illegal) "; // an illegal move
@@ -299,6 +322,7 @@ point Hex::machineMCMove(const vector<point>& moves){
     const int trials=1000; // num of trials for each possible move
     double winProb;
     priorityQueue q; // moves that have higher win prob have higher prioirty
+
     for(int i=0; i<moves.size(); i++){
         // show progress bar
         cout << "  running: " << progressBars[i%sizeof(progressBars)] << ' ' << static_cast<int>(100.*i/moves.size()) << "%\r";
@@ -329,6 +353,10 @@ point Hex::machineMCMove(const vector<point>& moves){
 }
 
 // point machineAlphaBetaMove(const vector<point>& moves){}
+
+// int Hex::getHeuristic(){
+//     // machine as max agent
+// }
 
 void Hex::runGame(){
     // run the game: human vs human, or human vs machine

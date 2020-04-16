@@ -15,6 +15,11 @@ const char progressBars[] = {'-','\\','|','/'};
 inline void seperator(int length=20){cout << string(length,'-') << endl;}
 inline double prob(){return static_cast<double>(rand())/RAND_MAX;}
 inline double uniformRand(double min, double max){return min+(max-min)*prob();}
+bool isInt(string str){
+    // check if a string is an int
+    for(auto c:str) if(isdigit(c)==false) return false;
+    return true;
+}
 
 /******************************************************************************/
 /* point (2D vector) */
